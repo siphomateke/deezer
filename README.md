@@ -17,6 +17,9 @@ To install on Ubuntu:
 git clone https://github.com/siphomateke/deezer
 cd deezer
 chmod +x ./install.sh
+npm install -g electron@^5 --unsafe-perm=true
+npm install -g --engine-strict asar
+npm install -g --engine-strict asar
 sudo ./install.sh
 ```
 
