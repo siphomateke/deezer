@@ -8,9 +8,6 @@ srcdir="$PWD"
 
 install_dependencies() {
     apt install p7zip imagemagick nodejs wget
-    npm install -g electron@^6 --unsafe-perm=true
-    npm install -g --engine-strict asar
-    npm install -g prettier
 }
 
 prepare() {
