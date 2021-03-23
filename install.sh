@@ -12,6 +12,10 @@ filesdir="$PWD/files"
 dir_electronrebuild="$PWD/builddir/electron-rebuild"
 _electronversion="6.1.12"
 
+# custom patches. you can select those you want
+_nomenu=no #yes/no
+_minimizetotray=no #yes/no
+
 # ----------------------- "METHODS"
 install_node_module() {
     printf "\nChecking if module %s is installed... " "$1"
@@ -55,20 +59,20 @@ pre_extract() {
         sudo xbps-install -y nodejs-lts
     fi
 
-    # Check Electron 6 and set/detect the Electron 6 alias
+    # Check Electron 6
     printf "\n\nChecking if Electron 6 is installed... "
 
 	# we will install Electron 6 on a local folder as it is really old version, and it's the one Deezer is asking...
     # check if it's already here
 	if [ -d "$HOME/electron6/node_modules/electron" ]; then
 		printf "OK.\nChecking for Electron 6 updates... "
-        cd "$HOME/electron6" && npm update electron@^6 && printf "OK.\n"
+        cd "$HOME/electron6" && npm i --silent --no-package-lock --unsafe-perm electron@$_electronversion && printf "OK.\n"
 	else
 		printf "NO.\nNode is installing Electron 6-1-x... "
 
         # create static folder, use Electron as static library
         mkdir -p "$HOME/electron6" && cd "$HOME/electron6" || exit 1
-        npm i --silent --prefix ./ --no-package-lock --unsafe-perm electron@^6
+        npm i --silent --prefix ./ --no-package-lock --unsafe-perm electron@$_electronversion
 
         printf "OK.\n"
 	fi
@@ -159,8 +163,8 @@ do_patch() {
     prettier --write "build/*.js"
 
     # Disable menu bar
-    patch -p1 < "$patchesdir/menu-bar.patch"
-    patch -p1 < "$patchesdir/quit.patch"
+    [ $_nomenu == "yes" ] && patch -p1 < "$patchesdir/menu-bar.patch"
+    [ $_minimizetotray == "yes" ] && patch -p1 < "$patchesdir/quit.patch"
     # Monkeypatch MPRIS D-Bus interface
     patch -p1 < "$patchesdir/0001-MPRIS-interface.patch"
 
