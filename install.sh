@@ -9,6 +9,8 @@ checksum="325f4dc58bed0c85a16d6920b72e0c11b6b062b2ba4b52ffa3a98f34182c2eb9"
 builddir="$PWD/builddir"
 patchesdir="$PWD/patches"
 filesdir="$PWD/files"
+dir_electronrebuild="$PWD/builddir/electron-rebuild"
+_electronversion="6.1.12"
 
 # ----------------------- "METHODS"
 install_node_module() {
@@ -75,6 +77,8 @@ pre_extract() {
     install_node_module asar
     install_node_module prettier
 
+    sudo npm install -g node-gyp
+
     # Workdir
     printf "\nCreating (and cleaning) working directory... "
     rm -rf "$builddir" || true
@@ -99,7 +103,7 @@ do_extract() {
 
 pre_patch() {
     cd "$builddir" || exit 1
-    # Mainly @SibrenVasse instructions
+    # Mainly @SibrenVasse instructions, but additional steps seem to be required...
 
     # Extract png from ico container
     printf "\n\nExtracting icons... "
@@ -112,11 +116,22 @@ pre_patch() {
     asar extract app.asar app &> /dev/null
     printf "OK."
 
-    printf "\nMaking some adjustements for OS... "
+    # Installing electron-rebuild locally
+    printf "\nInstalling electron-rebuild (builddep-only)... "
+    mkdir -p "$dir_electronrebuild"
+    cd "$dir_electronrebuild" || exit 1
+    npm i --silent -D --no-package-lock electron-rebuild
+    electronrebuild="$PWD/node_modules/.bin/electron-rebuild"
+    printf "OK."
+
+    printf "\nMaking some adjustements on bundle... "
+    cd "$builddir/resources" || exit 1
     mkdir -p app/resources/linux/
     cp win/systray.png app/resources/linux/systray.png
     # Remove NodeRT from package (-205.72 MiB)
     rm -r app/node_modules/@nodert
+    printf "OK.\nDoing crazy stuff with some node.js modules... "
+
     # Install extra node modules for mpris-service
     mkdir "$builddir/npm_temp"
     cd "$builddir/npm_temp" || exit 1
@@ -125,6 +140,11 @@ pre_patch() {
     for d in node_modules/*; do
         if [ ! -d "$builddir/resources/app/node_modules/$(basename $d)" ]
         then
+            # come on, we need to rebuild those modules for Electron...
+            cd "$d" || exit 1
+            HOME=~/.electron-gyp node-gyp rebuild --target=$_electronversion --arch=x64 --dist-url=https://electronjs.org/headers &> /dev/null
+            cd "$builddir/npm_temp" || exit 1
+
             mv "$d" "$builddir/resources/app/node_modules/"
         fi
     done
@@ -135,11 +155,12 @@ pre_patch() {
 do_patch() {
     cd "$builddir/resources/app" || exit 1
     echo "Patching..."
+    $electronrebuild --version $_electronversion --module-dir . || exit 1
     prettier --write "build/*.js"
 
     # Disable menu bar
     patch -p1 < "$patchesdir/menu-bar.patch"
-    # patch -p1 < "$patchesdir/quit.patch"
+    patch -p1 < "$patchesdir/quit.patch"
     # Monkeypatch MPRIS D-Bus interface
     patch -p1 < "$patchesdir/0001-MPRIS-interface.patch"
 
