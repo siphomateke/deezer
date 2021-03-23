@@ -7,6 +7,8 @@ pkgver=4.32.40
 distfile="https://www.deezer.com/desktop/download/artifact/win32/x86/$pkgver"
 checksum="325f4dc58bed0c85a16d6920b72e0c11b6b062b2ba4b52ffa3a98f34182c2eb9"
 builddir="$PWD/builddir"
+patchesdir="$PWD/patches"
+filesdir="$PWD/files"
 
 # ----------------------- "METHODS"
 install_node_module() {
@@ -85,7 +87,7 @@ pre_extract() {
     [ "$(sha256sum setup.exe | grep "$checksum" -c)" -gt 0 ] && printf "OK." || exit 1
 }
 
-extract() {
+do_extract() {
     cd "$builddir" || exit 1
 
     printf "\n\nExtracting package... "
@@ -127,22 +129,21 @@ pre_patch() {
         fi
     done
 
-    cd "$builddir/resources/app" || exit 1
-    prettier --write "build/*.js" &> /dev/null
-
-    printf "OK."
+    printf "OK.\n\n"
 }
 
-patch() {
+do_patch() {
     cd "$builddir/resources/app" || exit 1
-    printf "\nPatching...\n"
-
+    echo "Patching..."
     prettier --write "build/*.js"
+
     # Disable menu bar
-    patch -p1 < "$builddir/../menu-bar.patch"
-    # Optional patch for enabling "minimize to tray": patch -p1 < "$builddir/quit.patch"
+    patch -p1 < "$patchesdir/menu-bar.patch"
+    # patch -p1 < "$patchesdir/quit.patch"
     # Monkeypatch MPRIS D-Bus interface
-    patch -p1 < "$builddir/../0001-MPRIS-interface.patch"
+    patch -p1 < "$patchesdir/0001-MPRIS-interface.patch"
+
+    return
 }
 
 installation() {
@@ -169,14 +170,14 @@ installation() {
     sudo install -Dm644 resources/win/deezer-3.png /usr/share/icons/hicolor/64x64/apps/deezer.png
     sudo install -Dm644 resources/win/deezer-4.png /usr/share/icons/hicolor/128x128/apps/deezer.png
     sudo install -Dm644 resources/win/deezer-5.png /usr/share/icons/hicolor/256x256/apps/deezer.png
-    sudo install -Dm644 deezer.desktop /usr/share/applications/
-    sudo install -Dm755 deezer /usr/bin/
+    sudo install -Dm644 "$filesdir/deezer.desktop" /usr/share/applications/
+    sudo install -Dm755 "$filesdir/deezer" /usr/bin/
 
     # Make sure the deezer:// protocol handler is immediately registered as it's needed for login 
     sudo update-desktop-database --quiet
 
-    printf "OK."
+    printf "OK.\n\n"
 }
 
-pre_extract && extract && pre_patch && patch && installation
+pre_extract && do_extract && pre_patch && do_patch && installation
 echo "Successfully installed Deezer Desktop!"
